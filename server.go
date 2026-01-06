@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Session構造体を定義して、クライアントごとの状態を管理
@@ -144,6 +147,43 @@ func handleData(conn net.Conn, reader *bufio.Reader, session *Session) {
 	}
 	session.Body = body.String()
 	sendResponse(conn, "250 OK\r\n")
+
+	// セッションに保持しているメールの情報を永続化させる
+	// mailbox/userとしてディレクトリを作り、ファイルに保存する
+	saveMail(session)
+
+}
+func saveMail(session *Session) {
+	//メールの内容を構築
+	mailContent := fmt.Sprintf("From: %s\r\nTo: %s\r\n\r\n%s",
+		session.SenderMail,
+		strings.Join(session.RecipientMail, ", "),
+		session.Body,
+	)
+
+	//各受信者ごとにディレクトリを作成し、ファイルを保存
+	for _, recipient := range session.RecipientMail {
+		// 受信者のメールアドレスからユーザー名を取得
+		userName := strings.Split(recipient, "@")[0]
+		dir := filepath.Join("mailbox", userName)
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			fmt.Println("Error creating directory:", err)
+			continue
+		}
+
+		// ファイル名をタイムスタンプで作成
+		timestamp := time.Now().Format("20060102_150405")
+		filename := fmt.Sprintf("%s.mail", timestamp)
+		filepath := filepath.Join(dir, filename)
+		err = os.WriteFile(filepath, []byte(mailContent), 0644)
+		if err != nil {
+			fmt.Println("Error writing file:", err)
+			continue
+		}
+
+		fmt.Printf("Mail saved to %s\n", filepath)
+	}
 }
 
 func handleRset(conn net.Conn) {
