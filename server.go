@@ -11,7 +11,8 @@ import (
 type Session struct {
 	Domain        string
 	SenderMail    string
-	RecipientMail []string // 複数受信者を保持するためにスライスに変更
+	RecipientMail []string // 複数受信者を保持するためにスライス
+	Body          string   // メール本文を保持
 }
 
 func main() {
@@ -38,7 +39,7 @@ func main() {
 
 func handleClient(conn net.Conn) {
 	redeader := bufio.NewReader(conn)
-	session := &Session{}
+	session := &Session{} // 新しいセッションを作成
 
 	sendResponse(conn, "220 Welcome to the SMTP server\r\n")
 
@@ -64,6 +65,10 @@ func handleClient(conn net.Conn) {
 		} else if len(parts) >= 1 && parts[0] == "RCPT" && strings.HasPrefix(parts[1], "TO:") {
 			handleMailRcpt(conn, parts, session)
 			fmt.Println("Session after RCPT TO:", session)
+
+		} else if len(parts) >= 1 && parts[0] == "DATA" {
+			handleData(conn, redeader, session)
+			fmt.Println("Session after DATA:", session)
 
 		} else if len(parts) >= 1 && parts[0] == "RSET" {
 			session = &Session{}
@@ -118,6 +123,27 @@ func handleMailRcpt(conn net.Conn, parts []string, session *Session) {
 	} else {
 		sendResponse(conn, "501 Syntax error in parameters or arguments\r\n")
 	}
+}
+
+func handleData(conn net.Conn, reader *bufio.Reader, session *Session) {
+	sendResponse(conn, "354 End data with <CR><LF>.<CR><LF>\r\n")
+	var body strings.Builder
+	for {
+		line, err := reader.ReadString('\n')
+		//fmt.Println("[", line, "]")
+		fmt.Println(line)
+		if err != nil {
+			fmt.Println("Error reading data:", err)
+			return
+		}
+		if strings.TrimSpace(line) == "." {
+			fmt.Println("data end")
+			break
+		}
+		body.WriteString(line)
+	}
+	session.Body = body.String()
+	sendResponse(conn, "250 OK\r\n")
 }
 
 func handleRset(conn net.Conn) {
