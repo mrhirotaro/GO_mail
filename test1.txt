@@ -1,0 +1,6 @@
+input
+mailbox
+main.go
+README.md
+server.go
+test1.txt

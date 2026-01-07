@@ -1,0 +1,7 @@
+HELO inu.com
+MAIL FROM: user1@okapi.com
+RCPT TO: user2@momo.com
+DATA
+Nice to meet you!
+.
+
