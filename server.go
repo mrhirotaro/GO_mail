@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -29,33 +30,48 @@ func NewSMTPServer(port int) *SMTPServer {
 	}
 }
 
-func (s *SMTPServer) Start() { // 他所からアクセスできるようにするために大文字で始める
+func (s *SMTPServer) Start(ctx context.Context) error { // 他所からアクセスできるようにするために大文字で始める
 	// addressの文字列を作成
 	address := fmt.Sprintf("localhost:%d", s.Port)
 	var err error
 	s.listener, err = net.Listen("tcp", address)
 	if err != nil {
 		fmt.Println("Error starting server:", err)
-		return
+		return err
 	}
 	defer s.listener.Close()
 	//fmt.Println("Server listening on localhost:", s.Port)
 	fmt.Println("Server listening on", address)
 
-	conn, err := s.listener.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection:", err)
-		return
-	}
-	defer conn.Close()
-	fmt.Println("Client connected:", conn.RemoteAddr())
+	go func() {
+		<-ctx.Done()
+		fmt.Println("Shutting down server...")
+		s.listener.Close()
+	}()
 
-	// Handle client connection here
-	handleClient(conn)
+	for {
+		conn, err := s.listener.Accept()
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				fmt.Println("Server has been shut down.")
+				return nil
+			default:
+				fmt.Println("Error accepting connection:", err)
+				return err
+			}
+		}
+		fmt.Println("Client connected:", conn.RemoteAddr())
+
+		// Handle client connection here
+		go s.handleClient(conn)
+	}
 
 }
 
-func handleClient(conn net.Conn) {
+func (s *SMTPServer) handleClient(conn net.Conn) {
+	defer conn.Close()
+
 	redeader := bufio.NewReader(conn)
 	session := &Session{} // 新しいセッションを作成
 

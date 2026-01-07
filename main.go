@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 )
 
 func main() {
@@ -23,8 +26,22 @@ func main() {
 
 	fmt.Println("server on port:", port)
 
+	// コンテキストを作成
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// シグナルハンドラー
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		fmt.Println("Received interrupt signal, shutting down...")
+		cancel()
+	}()
+
 	// SMTPサーバーを作成して起動
 	server := NewSMTPServer(port)
-	server.Start()
+	server.Start(ctx)
 
 }
