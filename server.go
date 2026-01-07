@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+type SMTPServer struct {
+	Port     int
+	listener net.Listener
+}
+
 // Session構造体を定義して、クライアントごとの状態を管理
 type Session struct {
 	Domain        string
@@ -18,16 +23,26 @@ type Session struct {
 	Body          string   // メール本文を保持
 }
 
-func main() {
-	listener, err := net.Listen("tcp", "localhost:1025")
+func NewSMTPServer(port int) *SMTPServer {
+	return &SMTPServer{
+		Port: port,
+	}
+}
+
+func (s *SMTPServer) Start() { // 他所からアクセスできるようにするために大文字で始める
+	// addressの文字列を作成
+	address := fmt.Sprintf("localhost:%d", s.Port)
+	var err error
+	s.listener, err = net.Listen("tcp", address)
 	if err != nil {
 		fmt.Println("Error starting server:", err)
 		return
 	}
-	defer listener.Close()
-	fmt.Println("Server listening on localhost:1025")
+	defer s.listener.Close()
+	//fmt.Println("Server listening on localhost:", s.Port)
+	fmt.Println("Server listening on", address)
 
-	conn, err := listener.Accept()
+	conn, err := s.listener.Accept()
 	if err != nil {
 		fmt.Println("Error accepting connection:", err)
 		return
