@@ -40,8 +40,13 @@ func main() {
 		cancel()
 	}()
 
+	// ルーティングテーブルを作成
+	myRoutes := map[string]string{
+		"domain.com": "local",
+		"test.com":   "localhost:2026",
+	}
 	// SMTPサーバーを作成して起動
-	server := NewSMTPServer(port)
+	server := NewSMTPServer(port, myRoutes)
 	server.Start(ctx)
 
 }

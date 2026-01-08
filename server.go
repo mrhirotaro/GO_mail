@@ -12,8 +12,9 @@ import (
 )
 
 type SMTPServer struct {
-	Port     int
-	listener net.Listener
+	Port       int
+	listener   net.Listener
+	DomainRuts map[string]string
 }
 
 // Session構造体を定義して、クライアントごとの状態を管理
@@ -24,9 +25,10 @@ type Session struct {
 	Body          string   // メール本文を保持
 }
 
-func NewSMTPServer(port int) *SMTPServer {
+func NewSMTPServer(port int, domainRoutes map[string]string) *SMTPServer {
 	return &SMTPServer{
-		Port: port,
+		Port:       port,
+		DomainRuts: domainRoutes,
 	}
 }
 
@@ -42,6 +44,7 @@ func (s *SMTPServer) Start(ctx context.Context) error { // 他所からアクセ
 	defer s.listener.Close()
 	//fmt.Println("Server listening on localhost:", s.Port)
 	fmt.Println("Server listening on", address)
+	//fmt.Println("Domain Routes:", s.DomainRuts)
 
 	go func() {
 		<-ctx.Done()
@@ -89,6 +92,10 @@ func (s *SMTPServer) handleClient(conn net.Conn) {
 		commandUpper := strings.ToUpper(command)
 
 		parts := strings.Fields(commandUpper)
+
+		// ドメイン名の元の大文字小文字を保持
+		//originalParts := strings.Fields(command)
+
 		if len(parts) >= 1 && (parts[0] == "HELO" || parts[0] == "EHLO") {
 			handleHelo(conn, parts, session)
 			fmt.Println("Session after HELO/EHLO:", session)
@@ -101,7 +108,7 @@ func (s *SMTPServer) handleClient(conn net.Conn) {
 			fmt.Println("Session after RCPT TO:", session)
 
 		} else if len(parts) >= 1 && parts[0] == "DATA" {
-			handleData(conn, redeader, session)
+			s.handleData(conn, redeader, session)
 			fmt.Println("Session after DATA:", session)
 
 		} else if len(parts) >= 1 && parts[0] == "RSET" {
@@ -159,7 +166,7 @@ func handleMailRcpt(conn net.Conn, parts []string, session *Session) {
 	}
 }
 
-func handleData(conn net.Conn, reader *bufio.Reader, session *Session) {
+func (s *SMTPServer) handleData(conn net.Conn, reader *bufio.Reader, session *Session) {
 	sendResponse(conn, "354 End data with <CR><LF>.<CR><LF>\r\n")
 	var body strings.Builder
 	for {
@@ -181,10 +188,10 @@ func handleData(conn net.Conn, reader *bufio.Reader, session *Session) {
 
 	// セッションに保持しているメールの情報を永続化させる
 	// mailbox/userとしてディレクトリを作り、ファイルに保存する
-	saveMail(session)
+	s.saveMail(session)
 
 }
-func saveMail(session *Session) {
+func (s *SMTPServer) saveMail(session *Session) {
 	//メールの内容を構築
 	mailContent := fmt.Sprintf("From: %s\r\nTo: %s\r\n\r\n%s",
 		session.SenderMail,
@@ -194,6 +201,11 @@ func saveMail(session *Session) {
 
 	//各受信者ごとにディレクトリを作成し、ファイルを保存
 	for _, recipient := range session.RecipientMail {
+		if s.IsSaveMail(recipient) == false {
+			fmt.Println("Not local delivery. Skipping save for:", recipient)
+			continue
+		}
+
 		// 受信者のメールアドレスからユーザー名を取得
 		userName := strings.Split(recipient, "@")[0]
 		dir := filepath.Join("mailbox", userName)
