@@ -89,9 +89,9 @@ func (s *SMTPServer) handleClient(conn net.Conn) {
 
 		command := strings.TrimSpace(line)
 		fmt.Println("recv", command)
-		commandUpper := strings.ToUpper(command)
+		//commandUpper := strings.ToUpper(command)
 
-		parts := strings.Fields(commandUpper)
+		parts := strings.Fields(command)
 
 		// ドメイン名の元の大文字小文字を保持
 		//originalParts := strings.Fields(command)
@@ -203,6 +203,9 @@ func (s *SMTPServer) saveMail(session *Session) {
 	for _, recipient := range session.RecipientMail {
 		if s.IsSaveMail(recipient) == false {
 			fmt.Println("Not local delivery. Skipping save for:", recipient)
+
+			// ローカル配信でない場合は他のサーバーにリレーする処理をここに追加
+
 			continue
 		}
 
