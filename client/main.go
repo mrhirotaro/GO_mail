@@ -9,7 +9,7 @@ func main() {
 	client := NewSMTPClient(server_address)
 	domain := "inu.com"
 	senderMail := "user1@" + domain
-	recipientMail := "user2@" + domain
+	recipientMail := "user2@" + "domain.com"
 	data := "DATA"
 	body := "Hello, this is a test email."
 	client.Start(domain, senderMail, recipientMail, body, data)

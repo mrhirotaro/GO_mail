@@ -72,6 +72,19 @@ func (s *SMTPServer) Start(ctx context.Context) error { // 他所からアクセ
 
 }
 
+func (s *SMTPServer) validateBeforeData(session *Session) (bool, string) {
+	if session.Domain == "" {
+		return false, "503 Bad sequence of commands: send HELO/EHLO first\r\n"
+	}
+	if session.SenderMail == "" {
+		return false, "503 Bad sequence of commands: send MAIL FROM first\r\n"
+	}
+	if len(session.RecipientMail) == 0 {
+		return false, "503 Bad sequence of commands: send RCPT TO first\r\n"
+	}
+	return true, ""
+}
+
 func (s *SMTPServer) handleClient(conn net.Conn) {
 	defer conn.Close()
 
@@ -108,6 +121,11 @@ func (s *SMTPServer) handleClient(conn net.Conn) {
 			fmt.Println("Session after RCPT TO:", session)
 
 		} else if len(parts) >= 1 && parts[0] == "DATA" {
+			// DATAコマンドの前にHELO、MAIL FROM、RCPT TOが正しく送信されているか確認
+			if ok, msg := s.validateBeforeData(session); !ok {
+				sendResponse(conn, msg)
+				continue
+			}
 			s.handleData(conn, redeader, session)
 			fmt.Println("Session after DATA:", session)
 

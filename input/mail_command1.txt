@@ -1,6 +1,7 @@
 HELO inu.com
 MAIL FROM: user1@okapi.com
-RCPT TO: user2@domain.com
+RCPT TO: user3@domain.com
+RCPT TO: user4@domain.com
 DATA
 How are you?
 .
